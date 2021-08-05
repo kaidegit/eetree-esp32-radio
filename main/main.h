@@ -8,6 +8,12 @@
 #include <hal/spi_types.h>
 #include "esp_system.h"
 
+//Key pins config
+#define Key1_Pin        1
+#define Key2_Pin        2
+#define Key3_Pin        3
+#define Key4_Pin        6
+
 // OLED pins config
 #define OLED_CLK_Pin    36
 #define OLED_MOSI_Pin   35
@@ -21,5 +27,7 @@
 
 // MUX pin config
 #define MUX_Pin         42
+
+
 
 #endif //SMART_CONFIG_MAIN_H
