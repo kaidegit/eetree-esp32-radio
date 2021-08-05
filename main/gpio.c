@@ -8,12 +8,23 @@
 #include "oled.h"
 
 static void IRAM_ATTR gpio_isr_handler(void *arg) {
-//    printf("Key\r\n");
     OLED_ShowString(0, 3, (uint8_t *) "key", 16);
     uint32_t gpio_num = (uint32_t) arg;
-    if (gpio_num == Key1_Pin) {
-//        printf("Key1\r\n");
-        OLED_ShowString(50, 3, (uint8_t *) "1", 16);
+    switch (gpio_num) {
+        case Key1_Pin:
+            OLED_ShowString(50, 3, (uint8_t *) "1", 16);
+            break;
+        case Key2_Pin:
+            OLED_ShowString(50, 3, (uint8_t *) "2", 16);
+            break;
+        case Key3_Pin:
+            OLED_ShowString(50, 3, (uint8_t *) "3", 16);
+            break;
+        case Key4_Pin:
+            OLED_ShowString(50, 3, (uint8_t *) "4", 16);
+            break;
+        default:
+            break;
     }
 }
 
@@ -46,5 +57,9 @@ void MY_GPIO_Init() {
     gpio_set_intr_type(Key4_Pin, GPIO_INTR_NEGEDGE);
     gpio_install_isr_service(ESP_INTR_FLAG_LEVEL3);
     gpio_isr_handler_add(Key1_Pin, gpio_isr_handler, (void *) Key1_Pin);
+    gpio_isr_handler_add(Key2_Pin, gpio_isr_handler, (void *) Key2_Pin);
+    gpio_isr_handler_add(Key3_Pin, gpio_isr_handler, (void *) Key3_Pin);
+    gpio_isr_handler_add(Key4_Pin, gpio_isr_handler, (void *) Key4_Pin);
+
 }
 
