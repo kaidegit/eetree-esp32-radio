@@ -24,6 +24,7 @@
 // FM Module pins config
 #define FM_SCL_Pin      4
 #define FM_SDA_Pin      5
+#define FM_I2C_HOST     I2C_NUM_0
 
 // MUX pin config
 #define MUX_Pin         42
