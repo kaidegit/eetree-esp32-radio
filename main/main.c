@@ -15,8 +15,8 @@ void app_main(void) {
     MY_SPI_Init();
     OLED_Init();
     OLED_Clear();
-    char ch[] = "HelloWorld";
-    OLED_ShowString(0, 0, (uint8_t *) ch, 16);
+//    char ch[] = "HelloWorld";
+//    OLED_ShowString(0, 0, (uint8_t *) ch, 16);
     initialise_wifi();
 }
 
