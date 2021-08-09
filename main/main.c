@@ -11,6 +11,7 @@
 #include "i2c.h"
 #include "driver/i2c.h"
 
+
 void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
     MY_GPIO_Init();
