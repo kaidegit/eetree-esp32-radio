@@ -29,6 +29,10 @@
 // MUX pin config
 #define MUX_Pin         42
 
+// AUDIO Pin config
+#define AUDIO_Pin       17
+#define SPEAKER_EN_Pin  41
+
 
 
 #endif //SMART_CONFIG_MAIN_H

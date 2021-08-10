@@ -8,4 +8,7 @@ idf_component_register(
         "."
         "../Hardwares/OLED"
         "../Hardwares/FM"
+
+        EMBED_TXTFILES
+        "adf_music.mp3"
 )

@@ -10,6 +10,8 @@
 #include "spi.h"
 #include "i2c.h"
 #include "driver/i2c.h"
+#include "main.h"
+#include "audio.h"
 
 
 void app_main(void) {
@@ -17,6 +19,7 @@ void app_main(void) {
     MY_GPIO_Init();
     MY_SPI_Init();
     MY_I2C_Init();
+    MY_AUDIO_Init();
     OLED_Init();
     OLED_Clear();
     OLED_ShowString(0,0,(uint8_t*)"tm isnt synced",16);

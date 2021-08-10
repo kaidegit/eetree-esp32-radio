@@ -61,5 +61,12 @@ void MY_GPIO_Init() {
     gpio_isr_handler_add(Key3_Pin, gpio_isr_handler, (void *) Key3_Pin);
     gpio_isr_handler_add(Key4_Pin, gpio_isr_handler, (void *) Key4_Pin);
 
+    gpio_mask = 1ULL << SPEAKER_EN_Pin;
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pull_down_en = 1;
+    io_conf.pull_up_en = 0;
+    io_conf.pin_bit_mask = gpio_mask;
+    gpio_config(&io_conf);
 }
 
