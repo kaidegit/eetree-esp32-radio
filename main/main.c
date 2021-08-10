@@ -20,7 +20,7 @@ void app_main(void) {
     OLED_Init();
     OLED_Clear();
     OLED_ShowString(0,0,(uint8_t*)"tm isnt synced",16);
-/
+
 //    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
 //    i2c_master_start(cmd);
 //    i2c_master_write_byte(cmd, 0x21, 1);
