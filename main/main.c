@@ -19,7 +19,8 @@ void app_main(void) {
     MY_I2C_Init();
     OLED_Init();
     OLED_Clear();
-//
+    OLED_ShowString(0,0,(uint8_t*)"tm isnt synced",16);
+/
 //    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
 //    i2c_master_start(cmd);
 //    i2c_master_write_byte(cmd, 0x21, 1);
@@ -34,9 +35,9 @@ void app_main(void) {
 //    i2c_master_cmd_begin(FM_I2C_HOST, cmd, 1000 / portTICK_RATE_MS);
 //    i2c_cmd_link_delete(cmd);
 
-    char ch[30];
-    sprintf(ch, "%#X", (data_h << 8) + data_l);
-    OLED_ShowString(0, 0, (uint8_t *) ch, 16);
+//    char ch[30];
+//    sprintf(ch, "%#X", (data_h << 8) + data_l);
+//    OLED_ShowString(0, 0, (uint8_t *) ch, 16);
 
     initialise_wifi();
 }

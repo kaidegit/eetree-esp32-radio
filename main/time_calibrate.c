@@ -61,8 +61,8 @@ void show_time(void *pvParameters) {
         time(&now);
         localtime_r(&now, &timeinfo);
         timeinfo.tm_hour += 8;
-        sprintf(ch, "time:%d:%d:%d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-        OLED_ShowString(0, 2, (uint8_t *) ch, 16);
+        sprintf(ch, "time:%2d:%2d:%2d ", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        OLED_ShowString(0, 0, (uint8_t *) ch, 16);
         vTaskDelay(1000 / portTICK_RATE_MS);
     }
 }
