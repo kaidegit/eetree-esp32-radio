@@ -4,5 +4,6 @@ cmake_minimum_required(VERSION 3.5)
 
 set(IDF_TARGET esp32s2)
 
+include($ENV{ADF_PATH}/CMakeLists.txt)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(smart_config)
