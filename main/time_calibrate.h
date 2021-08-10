@@ -9,6 +9,7 @@
 
 void esp_wait_sntp_sync(void);
 
-extern struct tm timeinfo;
+void show_time(void * pvParameters);
+
 
 #endif //SMART_CONFIG_TIME_CALIBRATE_H

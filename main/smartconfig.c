@@ -23,6 +23,7 @@
 #include "esp_netif.h"
 #include "esp_smartconfig.h"
 #include "oled.h"
+#include "time_calibrate.h"
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t s_wifi_event_group;
@@ -116,8 +117,8 @@ static void smartconfig_example_task(void *parm) {
         uxBits = xEventGroupWaitBits(s_wifi_event_group, CONNECTED_BIT | ESPTOUCH_DONE_BIT, true, false, portMAX_DELAY);
         if (uxBits & CONNECTED_BIT) {
             ESP_LOGI(TAG, "WiFi Connected to ap");
-            OLED_ShowString(0, 0, (uint8_t *) "WiFi Connected to", 12);
-            OLED_ShowString(0, 1, (uint8_t *) ssid, 16);
+            ESP_LOGI(TAG, "Trying to fix the time");
+            esp_wait_sntp_sync();
         }
         if (uxBits & ESPTOUCH_DONE_BIT) {
             ESP_LOGI(TAG, "smartconfig over");
