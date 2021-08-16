@@ -2,10 +2,14 @@
 // Created by yekai on 2021/8/5.
 //
 
+#include "audio.h"
+#include "freertos/FreeRTOS.h"
+#include <freertos/task.h>
 #include "gpio.h"
 #include "driver/gpio.h"
 #include "main.h"
 #include "oled.h"
+
 
 static void IRAM_ATTR gpio_isr_handler(void *arg) {
     OLED_ShowString(0, 3, (uint8_t *) "key", 16);
@@ -13,6 +17,7 @@ static void IRAM_ATTR gpio_isr_handler(void *arg) {
     switch (gpio_num) {
         case Key1_Pin:
             OLED_ShowString(50, 3, (uint8_t *) "1", 16);
+            EnableSpeaker();
             break;
         case Key2_Pin:
             OLED_ShowString(50, 3, (uint8_t *) "2", 16);
@@ -22,15 +27,41 @@ static void IRAM_ATTR gpio_isr_handler(void *arg) {
             break;
         case Key4_Pin:
             OLED_ShowString(50, 3, (uint8_t *) "4", 16);
+            DisableSpeaker();
             break;
         default:
             break;
     }
 }
 
+void SetMuxFM(){
+    gpio_set_level(MUX_Pin, 0);
+}
+
+void SetMuxESP(){
+    gpio_set_level(MUX_Pin, 1);
+}
+
+void EnableSpeaker(){
+    gpio_set_level(SPEAKER_EN_Pin,1);
+}
+
+void DisableSpeaker(){
+    gpio_set_level(SPEAKER_EN_Pin,0);
+}
+
 void MY_GPIO_Init() {
     uint64_t gpio_mask;
     gpio_config_t io_conf;
+
+    gpio_mask = (1ULL << SPEAKER_EN_Pin) |
+                (1ULL << MUX_Pin);
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pull_down_en = 1;
+    io_conf.pull_up_en = 0;
+    io_conf.pin_bit_mask = gpio_mask;
+    gpio_config(&io_conf);
 
     gpio_mask = (1ULL << OLED_DC_Pin) |
                 (1ULL << OLED_RST_Pin);
@@ -61,12 +92,5 @@ void MY_GPIO_Init() {
     gpio_isr_handler_add(Key3_Pin, gpio_isr_handler, (void *) Key3_Pin);
     gpio_isr_handler_add(Key4_Pin, gpio_isr_handler, (void *) Key4_Pin);
 
-    gpio_mask = 1ULL << SPEAKER_EN_Pin;
-    io_conf.intr_type = GPIO_INTR_NEGEDGE;
-    io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pull_down_en = 1;
-    io_conf.pull_up_en = 0;
-    io_conf.pin_bit_mask = gpio_mask;
-    gpio_config(&io_conf);
 }
 

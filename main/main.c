@@ -12,6 +12,7 @@
 #include "driver/i2c.h"
 #include "main.h"
 #include "audio.h"
+#include "fm.h"
 
 
 void app_main(void) {
@@ -19,10 +20,17 @@ void app_main(void) {
     MY_GPIO_Init();
     MY_SPI_Init();
     MY_I2C_Init();
-    MY_AUDIO_Init();
+    //TODO:Audio is not available.
+//    MY_AUDIO_Init();
+    RDA_Init();
+    SetMuxFM();
+    EnableSpeaker();
+    RDA_SetBandFrequency(RADIO_BAND_US,(int)(102.1 * 1000));
     OLED_Init();
     OLED_Clear();
-    OLED_ShowString(0,0,(uint8_t*)"tm isnt synced",16);
+    OLED_ShowString(0, 0, (uint8_t *) "tm isnt synced", 16);
+
+//    gpio_set_level(SPEAKER_EN_Pin, 1);
 
 //    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
 //    i2c_master_start(cmd);

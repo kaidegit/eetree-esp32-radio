@@ -16,6 +16,7 @@
 
 audio_pipeline_handle_t pipeline;
 audio_element_handle_t mp3_decoder, output_stream_writer;
+audio_event_iface_handle_t evt;
 
 extern const uint8_t adf_music_mp3_start[] asm("_binary_adf_music_mp3_start");
 extern const uint8_t adf_music_mp3_end[] asm("_binary_adf_music_mp3_end");
@@ -103,7 +104,7 @@ void MY_AUDIO_Init() {
             .wait_time = portMAX_DELAY,
             .type = 0,
     };
-    audio_event_iface_handle_t evt = audio_event_iface_init(&evt_cfg);
+    evt = audio_event_iface_init(&evt_cfg);
 
 //    ESP_LOGI(TAG, "[3.1] Listening event from all elements of pipeline");
     audio_pipeline_set_listener(pipeline, evt);
@@ -113,4 +114,34 @@ void MY_AUDIO_Init() {
 
 //    ESP_LOGI(TAG, "[ 4 ] Start audio_pipeline");
     audio_pipeline_run(pipeline);
+}
+
+void AUDIO_Play(void *pvParameters){
+    while (true){
+        audio_event_iface_msg_t msg;
+        esp_err_t ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
+        //    if (ret != ESP_OK) {
+        //        ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
+        //        continue;
+        //    }
+
+        if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT && msg.source == (void *) mp3_decoder
+        && msg.cmd == AEL_MSG_CMD_REPORT_MUSIC_INFO) {
+            audio_element_info_t music_info = {0};
+            audio_element_getinfo(mp3_decoder, &music_info);
+            printf("[ * ] Receive music info from mp3 decoder, sample_rates=%d, bits=%d, ch=%d",
+                   music_info.sample_rates, music_info.bits, music_info.channels);
+            audio_element_setinfo(output_stream_writer, &music_info);
+            pwm_stream_set_clk(output_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
+            continue;
+        }
+        /* Stop when the last pipeline element (output_stream_writer in this case) receives stop event */
+        if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT && msg.source == (void *) output_stream_writer
+        && msg.cmd == AEL_MSG_CMD_REPORT_STATUS
+        && (((int)msg.data == AEL_STATUS_STATE_STOPPED) || ((int)msg.data == AEL_STATUS_STATE_FINISHED))) {
+            printf( "[ * ] Stop event received");
+            vTaskDelete(AUDIO_Play);
+        }
+    }
+
 }
