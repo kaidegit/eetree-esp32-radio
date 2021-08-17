@@ -3,7 +3,10 @@
 //
 
 #include <driver/i2c.h>
+#include <oled.h>
 #include "fm.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #define FM907_Freq 90700
 
@@ -71,6 +74,8 @@ void RDA_Init() {
     RDA_WriteAllInfo();
 
     RDA_Reset();
+
+    xTaskCreate(show_fm, "show_fm", 4096, NULL, 3, NULL);
 }
 
 void RDA_Reset() {
@@ -125,6 +130,7 @@ void RDA_SetFrequency(RADIO_FREQ newFreq) {
 }
 
 void RDA_SetBand(enum RADIO_BAND newBand) {
+    RDA5807.band = newBand;
     switch (newBand) {
         case RADIO_BAND_US:
             RDA5807.regList[RADIO_REG_CHAN] &= !RADIO_REG_CHAN_BAND;
@@ -147,6 +153,16 @@ void RDA_SetBand(enum RADIO_BAND newBand) {
     }
     RDA5807.regList[RADIO_REG_CHAN] |= RADIO_REG_CHAN_SPACE_100;
     RDA_WriteAllInfo();
+}
+
+void show_fm(void *pvParameters) {
+    char ch[30];
+    while (true) {
+        RDA_ReadAllInfo();
+        sprintf(ch, "%d %d", RDA5807.freq,RDA5807.radioInfo.rssi);
+        OLED_ShowString(0, 6, (uint8_t *) ch, 16);
+        vTaskDelay(1000 / portTICK_RATE_MS);
+    }
 }
 
 

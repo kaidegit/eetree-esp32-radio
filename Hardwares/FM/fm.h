@@ -106,6 +106,8 @@ typedef struct RDA_Handler {
     uint16_t regList[8];
 } RDA_Handler;
 
+void show_fm(void *pvParameters);
+
 void RDA_ReadAllInfo();
 
 void RDA_WriteAllInfo();
