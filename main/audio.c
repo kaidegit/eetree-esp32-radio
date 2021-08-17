@@ -1,147 +1,183 @@
-//
-// Created by yekai on 2021/8/10.
-//
-
-
-#include <audio_common.h>
-#include <audio_element.h>
-#include <audio_pipeline.h>
-#include <esp_log.h>
-#include <esp_peripherals.h>
-#include <mp3_decoder.h>
 #include <string.h>
-#include "audio.h"
-#include "main.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "esp_log.h"
+#include "esp_wifi.h"
+#include "nvs_flash.h"
+#include "sdkconfig.h"
+#include "audio_element.h"
+#include "audio_pipeline.h"
+#include "audio_event_iface.h"
+#include "audio_common.h"
+#include "http_stream.h"
+#include "i2s_stream.h"
+#include "aac_decoder.h"
 #include <pwm_stream.h>
 
-audio_pipeline_handle_t pipeline;
-audio_element_handle_t mp3_decoder, output_stream_writer;
+#include "esp_peripherals.h"
+#include "periph_wifi.h"
+#include "board.h"
+#include "esp_netif.h"
+#include "smartconfig.h"
+#include "audio.h"
+#include "main.h"
+
+
+static const char *TAG = "HTTP_LIVINGSTREAM_EXAMPLE";
+
+#define AAC_STREAM_URI "http://open.ls.qingting.fm/live/274/64k.m3u8?format=aac"
+
 audio_event_iface_handle_t evt;
+esp_periph_set_handle_t set;
+audio_pipeline_handle_t pipeline;
+audio_element_handle_t http_stream_reader, output_stream_writer, aac_decoder;
 
-extern const uint8_t adf_music_mp3_start[] asm("_binary_adf_music_mp3_start");
-extern const uint8_t adf_music_mp3_end[] asm("_binary_adf_music_mp3_end");
-
-
-int mp3_music_read_cb(audio_element_handle_t el, char *buf, int len, TickType_t wait_time, void *ctx) {
-    static int mp3_pos;
-    int read_size = adf_music_mp3_end - adf_music_mp3_start - mp3_pos;
-    if (read_size == 0) {
-        return AEL_IO_DONE;
-    } else if (len < read_size) {
-        read_size = len;
+int _http_stream_event_handle(http_stream_event_msg_t *msg) {
+    if (msg->event_id == HTTP_STREAM_RESOLVE_ALL_TRACKS) {
+        return ESP_OK;
     }
-    memcpy(buf, adf_music_mp3_start + mp3_pos, read_size);
-    mp3_pos += read_size;
-    return read_size;
+
+    if (msg->event_id == HTTP_STREAM_FINISH_TRACK) {
+        return http_stream_next_track(msg->el);
+    }
+    if (msg->event_id == HTTP_STREAM_FINISH_PLAYLIST) {
+        return http_stream_fetch_again(msg->el);
+    }
+    return ESP_OK;
 }
 
 void MY_AUDIO_Init() {
-//    ESP_LOGI(TAG, "[ 1 ] Periph init");
-    esp_periph_config_t periph_cfg = {
-            .task_stack         = DEFAULT_ESP_PERIPH_STACK_SIZE,
-            .task_prio          = DEFAULT_ESP_PERIPH_TASK_PRIO,
-            .task_core          = DEFAULT_ESP_PERIPH_TASK_CORE,
-            .extern_stack       = false,
-    };
-    esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
+    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set(TAG, ESP_LOG_DEBUG);
 
-//    ESP_LOGI(TAG, "[ 2 ] Create audio pipeline for playback");
-    audio_pipeline_cfg_t pipeline_cfg = {
-            .rb_size            = DEFAULT_PIPELINE_RINGBUF_SIZE,
-    };
+//    ESP_LOGI(TAG, "[ 1 ] Start audio codec chip");
+//    audio_board_handle_t board_handle = audio_board_init();
+//    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_DECODE, AUDIO_HAL_CTRL_START);
+    ESP_LOGI(TAG, "[ 1 ] Periph init");
+    esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
+    set = esp_periph_set_init(&periph_cfg);
+
+    ESP_LOGI(TAG, "[2.0] Create audio pipeline for playback");
+    audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
     pipeline = audio_pipeline_init(&pipeline_cfg);
-    mem_assert(pipeline);
 
-//    ESP_LOGI(TAG, "[2.1] Create output stream to write data to codec chip");
-    pwm_stream_cfg_t pwm_cfg = {
-            .type = AUDIO_STREAM_WRITER,
-            .pwm_config = {
-                    .tg_num = TIMER_GROUP_0,
-                    .timer_num = TIMER_0,
-                    .gpio_num_left = AUDIO_Pin,
-                    .gpio_num_right = -1,
-                    .ledc_channel_left = LEDC_CHANNEL_0,
-                    .ledc_channel_right = -1,
-                    .ledc_timer_sel = LEDC_TIMER_0,
-                    .duty_resolution = LEDC_TIMER_8_BIT,
-                    .data_len = PWM_CONFIG_RINGBUFFER_SIZE,
-            },
-            .out_rb_size = PWM_STREAM_RINGBUFFER_SIZE,
-            .task_stack = PWM_STREAM_TASK_STACK,
-            .task_core = PWM_STREAM_TASK_CORE,
-            .task_prio = PWM_STREAM_TASK_PRIO,
-            .buffer_len =  PWM_STREAM_BUF_SIZE,
-            .ext_stack = false,
-    };
+    ESP_LOGI(TAG, "[2.1] Create http stream to read data");
+    http_stream_cfg_t http_cfg = HTTP_STREAM_CFG_DEFAULT();
+    http_cfg.event_handle = _http_stream_event_handle;
+    http_cfg.type = AUDIO_STREAM_READER;
+    http_cfg.enable_playlist_parser = true;
+    http_stream_reader = http_stream_init(&http_cfg);
+
+    ESP_LOGI(TAG, "[2.2] Create pwm stream to write data to codec chip");
+    pwm_stream_cfg_t pwm_cfg = PWM_STREAM_CFG_DEFAULT();
+    pwm_cfg.pwm_config.gpio_num_left = AUDIO_Pin;
+    pwm_cfg.pwm_config.gpio_num_right = -1;
     output_stream_writer = pwm_stream_init(&pwm_cfg);
 
-//    ESP_LOGI(TAG, "[2.2] Create wav decoder to decode wav file");
-    mp3_decoder_cfg_t mp3_cfg = {
-            .out_rb_size        = MP3_DECODER_RINGBUFFER_SIZE,
-            .task_stack         = MP3_DECODER_TASK_STACK_SIZE,
-            .task_core          = MP3_DECODER_TASK_CORE,
-            .task_prio          = MP3_DECODER_TASK_PRIO,
-            .stack_in_ext       = true,
-    };
-    mp3_decoder = mp3_decoder_init(&mp3_cfg);
-    audio_element_set_read_cb(mp3_decoder, mp3_music_read_cb, NULL);
+    ESP_LOGI(TAG, "[2.3] Create aac decoder to decode aac file");
+    aac_decoder_cfg_t aac_cfg = DEFAULT_AAC_DECODER_CONFIG();
+    aac_decoder = aac_decoder_init(&aac_cfg);
 
-//    ESP_LOGI(TAG, "[2.3] Register all elements to audio pipeline");
-    audio_pipeline_register(pipeline, mp3_decoder, "mp3");
-    audio_pipeline_register(pipeline, output_stream_writer, "output");
+    ESP_LOGI(TAG, "[2.4] Register all elements to audio pipeline");
+    audio_pipeline_register(pipeline, http_stream_reader, "http");
+    audio_pipeline_register(pipeline, aac_decoder, "aac");
+    audio_pipeline_register(pipeline, output_stream_writer, "pwm");
 
-//    ESP_LOGI(TAG, "[2.4] Link it together [mp3_music_read_cb]-->mp3_decoder-->output_stream-->[pa_chip]");
-    const char *link_tag[2] = {"mp3", "output"};
-    audio_pipeline_link(pipeline, &link_tag[0], 2);
+    ESP_LOGI(TAG, "[2.5] Link it together http_stream-->aac_decoder-->pwm_stream");
+    const char *link_tag[3] = {"http", "aac", "pwm"};
+    audio_pipeline_link(pipeline, &link_tag[0], 3);
 
-//    ESP_LOGI(TAG, "[ 3 ] Set up  event listener");
-    audio_event_iface_cfg_t evt_cfg = {
-            .internal_queue_size = DEFAULT_AUDIO_EVENT_IFACE_SIZE,
-            .external_queue_size = DEFAULT_AUDIO_EVENT_IFACE_SIZE,
-            .queue_set_size = DEFAULT_AUDIO_EVENT_IFACE_SIZE,
-            .on_cmd = NULL,
-            .context = NULL,
-            .wait_time = portMAX_DELAY,
-            .type = 0,
-    };
+    ESP_LOGI(TAG, "[2.6] Set up  uri (http as http_stream, aac as aac decoder, and default output is pwm)");
+    audio_element_set_uri(http_stream_reader, AAC_STREAM_URI);
+
+    ESP_LOGI(TAG, "[ 3 ] Start and wait for Wi-Fi network");
+//    periph_wifi_cfg_t wifi_cfg = {
+//            .ssid = (const char *) wifi_config.sta.ssid,
+//            .password = (const char *) wifi_config.sta.password,
+//    };
+//    esp_periph_handle_t wifi_handle = periph_wifi_init(&wifi_cfg);
+//    esp_periph_start(set, wifi_handle);
+//    periph_wifi_wait_for_connected(wifi_handle, portMAX_DELAY);
+
+    ESP_LOGI(TAG, "[ 4 ] Set up  event listener");
+    audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
     evt = audio_event_iface_init(&evt_cfg);
 
-//    ESP_LOGI(TAG, "[3.1] Listening event from all elements of pipeline");
+    ESP_LOGI(TAG, "[4.1] Listening event from all elements of pipeline");
     audio_pipeline_set_listener(pipeline, evt);
 
-//    ESP_LOGI(TAG, "[3.2] Listening event from peripherals");
+    ESP_LOGI(TAG, "[4.2] Listening event from peripherals");
     audio_event_iface_set_listener(esp_periph_set_get_event_iface(set), evt);
 
-//    ESP_LOGI(TAG, "[ 4 ] Start audio_pipeline");
+    ESP_LOGI(TAG, "[ 5 ] Start audio_pipeline");
     audio_pipeline_run(pipeline);
 }
 
-void AUDIO_Play(void *pvParameters){
-    while (true){
+void Audio_Play() {
+    while (1) {
         audio_event_iface_msg_t msg;
         esp_err_t ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
-        //    if (ret != ESP_OK) {
-        //        ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
-        //        continue;
-        //    }
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
+            continue;
+        }
 
-        if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT && msg.source == (void *) mp3_decoder
-        && msg.cmd == AEL_MSG_CMD_REPORT_MUSIC_INFO) {
+        if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT &&
+            msg.source == (void *) aac_decoder &&
+            msg.cmd == AEL_MSG_CMD_REPORT_MUSIC_INFO) {
             audio_element_info_t music_info = {0};
-            audio_element_getinfo(mp3_decoder, &music_info);
-            printf("[ * ] Receive music info from mp3 decoder, sample_rates=%d, bits=%d, ch=%d",
-                   music_info.sample_rates, music_info.bits, music_info.channels);
+            audio_element_getinfo(aac_decoder, &music_info);
+
+            ESP_LOGI(TAG, "[ * ] Receive music info from aac decoder, sample_rates=%d, bits=%d, ch=%d",
+                     music_info.sample_rates, music_info.bits, music_info.channels);
+
             audio_element_setinfo(output_stream_writer, &music_info);
             pwm_stream_set_clk(output_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
             continue;
         }
-        /* Stop when the last pipeline element (output_stream_writer in this case) receives stop event */
-        if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT && msg.source == (void *) output_stream_writer
-        && msg.cmd == AEL_MSG_CMD_REPORT_STATUS
-        && (((int)msg.data == AEL_STATUS_STATE_STOPPED) || ((int)msg.data == AEL_STATUS_STATE_FINISHED))) {
-            printf( "[ * ] Stop event received");
-            vTaskDelete(AUDIO_Play);
+
+        /* restart stream when the first pipeline element (http_stream_reader in this case) receives stop event (caused by reading errors) */
+        if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT && msg.source == (void *) http_stream_reader
+            && msg.cmd == AEL_MSG_CMD_REPORT_STATUS && (int) msg.data == AEL_STATUS_ERROR_OPEN) {
+            ESP_LOGW(TAG, "[ * ] Restart stream");
+            audio_pipeline_stop(pipeline);
+            audio_pipeline_wait_for_stop(pipeline);
+            audio_element_reset_state(aac_decoder);
+            audio_element_reset_state(output_stream_writer);
+            audio_pipeline_reset_ringbuffer(pipeline);
+            audio_pipeline_reset_items_state(pipeline);
+            audio_pipeline_run(pipeline);
+            continue;
         }
     }
+}
 
+void Audio_Stop() {
+    ESP_LOGI(TAG, "[ 6 ] Stop audio_pipeline");
+    audio_pipeline_stop(pipeline);
+    audio_pipeline_wait_for_stop(pipeline);
+    audio_pipeline_terminate(pipeline);
+
+    audio_pipeline_unregister(pipeline, http_stream_reader);
+    audio_pipeline_unregister(pipeline, output_stream_writer);
+    audio_pipeline_unregister(pipeline, aac_decoder);
+
+    /* Terminate the pipeline before removing the listener */
+    audio_pipeline_remove_listener(pipeline);
+
+    /* Stop all peripherals before removing the listener */
+    esp_periph_set_stop_all(set);
+    audio_event_iface_remove_listener(esp_periph_set_get_event_iface(set), evt);
+
+    /* Make sure audio_pipeline_remove_listener & audio_event_iface_remove_listener are called before destroying event_iface */
+    audio_event_iface_destroy(evt);
+
+    /* Release all resources */
+    audio_pipeline_deinit(pipeline);
+    audio_element_deinit(http_stream_reader);
+    audio_element_deinit(output_stream_writer);
+    audio_element_deinit(aac_decoder);
+    esp_periph_set_destroy(set);
 }

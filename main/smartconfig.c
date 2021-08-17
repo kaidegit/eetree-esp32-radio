@@ -8,7 +8,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-
+#include "smartconfig.h"
 #include <string.h>
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
@@ -38,6 +38,8 @@ static const char *TAG = "smartconfig_example";
 uint8_t ssid[33] = {0};
 uint8_t password[65] = {0};
 uint8_t rvd_data[33] = {0};
+wifi_config_t wifi_config;
+bool isConnect = false;
 
 static void smartconfig_example_task(void *parm);
 
@@ -58,8 +60,6 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Got SSID and password");
 
         smartconfig_event_got_ssid_pswd_t *evt = (smartconfig_event_got_ssid_pswd_t *) event_data;
-        wifi_config_t wifi_config;
-
 
         bzero(&wifi_config, sizeof(wifi_config_t));
         memcpy(wifi_config.sta.ssid, evt->ssid, sizeof(wifi_config.sta.ssid));
@@ -118,7 +118,7 @@ static void smartconfig_example_task(void *parm) {
         if (uxBits & CONNECTED_BIT) {
             ESP_LOGI(TAG, "WiFi Connected to ap");
             ESP_LOGI(TAG, "Trying to fix the time");
-            esp_wait_sntp_sync();
+            isConnect = true;
         }
         if (uxBits & ESPTOUCH_DONE_BIT) {
             ESP_LOGI(TAG, "smartconfig over");

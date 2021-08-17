@@ -7,6 +7,8 @@
 
 void MY_AUDIO_Init();
 
-void AUDIO_Play(void *pvParameters);
+void Audio_Play();
+
+void Audio_Stop();
 
 #endif //SMART_CONFIG_AUDIO_H
