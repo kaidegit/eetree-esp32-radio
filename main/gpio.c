@@ -11,7 +11,7 @@
 #include "oled.h"
 
 
-static void IRAM_ATTR gpio_isr_handler(void *arg) {
+static void gpio_isr_handler(void *arg) {
     OLED_ShowString(0, 3, (uint8_t *) "key", 16);
     uint32_t gpio_num = (uint32_t) arg;
     switch (gpio_num) {

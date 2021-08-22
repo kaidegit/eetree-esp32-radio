@@ -23,7 +23,8 @@ void app_main(void) {
     MY_I2C_Init();
 
     RDA_Init();
-    SetMuxFM();
+//    SetMuxFM();
+    SetMuxESP();
     EnableSpeaker();
     RDA_SetBandFrequency(RADIO_BAND_US, (int) (102.1 * 1000));
     OLED_Init();
@@ -36,7 +37,6 @@ void app_main(void) {
     }
 
     esp_wait_sntp_sync();
-    //TODO:Audio is not available.
     MY_AUDIO_Init();
     Audio_Play();
 }
