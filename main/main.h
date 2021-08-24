@@ -7,6 +7,7 @@
 
 #include <hal/spi_types.h>
 #include "esp_system.h"
+#include "stdbool.h"
 
 //Key pins config
 #define Key1_Pin        1

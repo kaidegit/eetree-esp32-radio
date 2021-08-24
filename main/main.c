@@ -14,7 +14,7 @@
 #include "audio.h"
 #include "fm.h"
 #include "time_calibrate.h"
-
+#include "gui.h"
 
 void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
@@ -29,7 +29,8 @@ void app_main(void) {
     RDA_SetBandFrequency(RADIO_BAND_US, (int) (102.1 * 1000));
     OLED_Init();
     OLED_Clear();
-    OLED_ShowString(0, 0, (uint8_t *) "tm isnt synced", 16);
+    GUI_Init();
+//    OLED_ShowString(0, 0, (uint8_t *) "tm isnt synced", 16);
 
     initialise_wifi();
     while (!isConnect) {
@@ -37,7 +38,7 @@ void app_main(void) {
     }
 
     esp_wait_sntp_sync();
-    MY_AUDIO_Init();
+//    MY_AUDIO_Init();
     Audio_Play();
 }
 

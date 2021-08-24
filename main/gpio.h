@@ -15,4 +15,8 @@ void EnableSpeaker();
 
 void DisableSpeaker();
 
+void ToggleSpeaker();
+
+//static void gpio_isr_handler(void *arg);
+
 #endif //SMART_CONFIG_GPIO_H

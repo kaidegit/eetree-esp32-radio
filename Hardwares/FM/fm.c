@@ -75,7 +75,7 @@ void RDA_Init() {
 
     RDA_Reset();
 
-    xTaskCreate(show_fm, "show_fm", 4096, NULL, 3, NULL);
+//    xTaskCreate(show_fm, "show_fm", 4096, NULL, 3, NULL);
 }
 
 void RDA_Reset() {

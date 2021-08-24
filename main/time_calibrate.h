@@ -9,7 +9,9 @@
 
 void esp_wait_sntp_sync(void);
 
-void show_time(void * pvParameters);
+//void show_time(void * pvParameters);
+
+extern bool isTimeCorrect;
 
 
 #endif //SMART_CONFIG_TIME_CALIBRATE_H

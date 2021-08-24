@@ -10,6 +10,8 @@
 #include "oled.h"
 #include "time_calibrate.h"
 
+bool isTimeCorrect = false;
+
 static const char *TAG = "sntp";
 
 static void esp_initialize_sntp(void) {
@@ -39,12 +41,14 @@ void esp_wait_sntp_sync(void) {
 
     // set timezone to China Standard Time
 //    setenv("TZ", "UTC+8", 1);
-    timeinfo.tm_hour += 8;
+//    timeinfo.tm_hour += 8;
+    setenv("TZ", "CST-8", 1);
     tzset();
 
     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
     ESP_LOGI(TAG, "The current date/time in Shanghai is: %s", strftime_buf);
-    xTaskCreate(show_time, "show_time", 4096, NULL, 3, NULL);
+//    xTaskCreate(show_time, "show_time", 4096, NULL, 3, NULL);
+    isTimeCorrect = true;
 
     sntp_stop();
 }
@@ -53,16 +57,16 @@ void esp_wait_sntp_sync(void) {
 //版权声明：本文为CSDN博主「乐鑫科技 Espressif」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
 //原文链接：https://blog.csdn.net/espressif/article/details/103001337
 
-void show_time(void *pvParameters) {
-    char ch[30];
-    while (true){
-        time_t now = 0;
-        struct tm timeinfo = {0};
-        time(&now);
-        localtime_r(&now, &timeinfo);
-        timeinfo.tm_hour += 8;
-        sprintf(ch, "time:%2d:%2d:%2d ", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-        OLED_ShowString(0, 0, (uint8_t *) ch, 16);
-        vTaskDelay(1000 / portTICK_RATE_MS);
-    }
-}
+//void show_time(void *pvParameters) {
+//    char ch[30];
+//    while (true){
+//        time_t now = 0;
+//        struct tm timeinfo = {0};
+//        time(&now);
+//        localtime_r(&now, &timeinfo);
+//        timeinfo.tm_hour += 8;
+//        sprintf(ch, "time:%2d:%2d:%2d ", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+//        OLED_ShowString(0, 0, (uint8_t *) ch, 16);
+//        vTaskDelay(1000 / portTICK_RATE_MS);
+//    }
+//}

@@ -122,4 +122,6 @@ void RDA_SetFrequency(RADIO_FREQ newFreq);
 
 void RDA_SetBand(enum RADIO_BAND newBand);
 
+extern struct RDA_Handler RDA5807;
+
 #endif //SMART_CONFIG_FM_H

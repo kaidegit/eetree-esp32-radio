@@ -33,6 +33,7 @@ audio_event_iface_handle_t evt;
 esp_periph_set_handle_t set;
 audio_pipeline_handle_t pipeline;
 audio_element_handle_t http_stream_reader, output_stream_writer, aac_decoder;
+uint16_t stationID = 274;
 
 int _http_stream_event_handle(http_stream_event_msg_t *msg) {
     if (msg->event_id == HTTP_STREAM_RESOLVE_ALL_TRACKS) {
@@ -95,9 +96,11 @@ void MY_AUDIO_Init() {
     audio_pipeline_link(pipeline, &link_tag[0], 3);
 
     ESP_LOGI(TAG, "[2.6] Set up  uri (http as http_stream, aac as aac decoder, and default output is pwm)");
-    audio_element_set_uri(http_stream_reader, AAC_STREAM_URI);
+    char url[100];
+    sprintf(url, "http://open.ls.qingting.fm/live/%d/64k.m3u8?format=aac", stationID);
+    audio_element_set_uri(http_stream_reader, url);
 
-    ESP_LOGI(TAG, "[ 3 ] Start and wait for Wi-Fi network");
+//    ESP_LOGI(TAG, "[ 3 ] Start and wait for Wi-Fi network");
 //    esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
 //    set = esp_periph_set_init(&periph_cfg);
 //    periph_wifi_cfg_t wifi_cfg = {
@@ -123,6 +126,7 @@ void MY_AUDIO_Init() {
 }
 
 void Audio_Play() {
+    MY_AUDIO_Init();
     while (1) {
         audio_event_iface_msg_t msg;
         esp_err_t ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
@@ -187,4 +191,12 @@ void Audio_Stop() {
     audio_element_deinit(output_stream_writer);
     audio_element_deinit(aac_decoder);
 //    esp_periph_set_destroy(set);
+}
+
+void Audio_SelectStation(uint16_t new_stationID) {
+    Audio_Stop();
+    char url[100];
+    sprintf(url, "http://open.ls.qingting.fm/live/%d/64k.m3u8?format=aac", new_stationID);
+    audio_element_set_uri(http_stream_reader, url);
+    Audio_Play();
 }

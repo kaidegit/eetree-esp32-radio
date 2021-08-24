@@ -3,12 +3,11 @@ idf_component_register(
         "."
         "../Hardwares/OLED"
         "../Hardwares/FM"
+        "../Middlewares/GUI"
 
         INCLUDE_DIRS
         "."
         "../Hardwares/OLED"
         "../Hardwares/FM"
-
-#        EMBED_TXTFILES
-#        "adf_music.mp3"
+        "../Middlewares/GUI"
 )

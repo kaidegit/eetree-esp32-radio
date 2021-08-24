@@ -9,45 +9,55 @@
 #include "driver/gpio.h"
 #include "main.h"
 #include "oled.h"
+#include "gui.h"
 
+bool isSpeakerOn = false;
 
 static void gpio_isr_handler(void *arg) {
-    OLED_ShowString(0, 3, (uint8_t *) "key", 16);
     uint32_t gpio_num = (uint32_t) arg;
     switch (gpio_num) {
         case Key1_Pin:
-            OLED_ShowString(50, 3, (uint8_t *) "1", 16);
-            EnableSpeaker();
+            isFM = !isFM;
             break;
         case Key2_Pin:
-            OLED_ShowString(50, 3, (uint8_t *) "2", 16);
+            //            OLED_ShowString(50, 3, (uint8_t *) "2", 16);
             break;
         case Key3_Pin:
-            OLED_ShowString(50, 3, (uint8_t *) "3", 16);
+            //            OLED_ShowString(50, 3, (uint8_t *) "3", 16);
             break;
         case Key4_Pin:
-            OLED_ShowString(50, 3, (uint8_t *) "4", 16);
-            DisableSpeaker();
+            //            OLED_ShowString(50, 3, (uint8_t *) "4", 16);
+            ToggleSpeaker();
             break;
         default:
             break;
     }
 }
 
-void SetMuxFM(){
+void SetMuxFM() {
     gpio_set_level(MUX_Pin, 0);
 }
 
-void SetMuxESP(){
+void SetMuxESP() {
     gpio_set_level(MUX_Pin, 1);
 }
 
-void EnableSpeaker(){
-    gpio_set_level(SPEAKER_EN_Pin,1);
+void EnableSpeaker() {
+    isSpeakerOn = true;
+    gpio_set_level(SPEAKER_EN_Pin, 1);
 }
 
-void DisableSpeaker(){
-    gpio_set_level(SPEAKER_EN_Pin,0);
+void DisableSpeaker() {
+    isSpeakerOn = false;
+    gpio_set_level(SPEAKER_EN_Pin, 0);
+}
+
+void ToggleSpeaker() {
+    if (isSpeakerOn) {
+        DisableSpeaker();
+    } else {
+        EnableSpeaker();
+    }
 }
 
 void MY_GPIO_Init() {
@@ -91,6 +101,5 @@ void MY_GPIO_Init() {
     gpio_isr_handler_add(Key2_Pin, gpio_isr_handler, (void *) Key2_Pin);
     gpio_isr_handler_add(Key3_Pin, gpio_isr_handler, (void *) Key3_Pin);
     gpio_isr_handler_add(Key4_Pin, gpio_isr_handler, (void *) Key4_Pin);
-
 }
 
