@@ -23,6 +23,10 @@ void OLED_ShowTime();
 
 void OLED_ShowQingtingLogo(uint8_t x, uint8_t y);
 
+uint16_t ConvStaIDToName(uint16_t _stationID);
+
 extern bool isFM;
+
+extern uint32_t freq_temp;
 
 #endif //SMART_CONFIG_GUI_H

@@ -23,14 +23,10 @@ void app_main(void) {
     MY_I2C_Init();
 
     RDA_Init();
-//    SetMuxFM();
-    SetMuxESP();
-    EnableSpeaker();
     RDA_SetBandFrequency(RADIO_BAND_US, (int) (102.1 * 1000));
     OLED_Init();
     OLED_Clear();
     GUI_Init();
-//    OLED_ShowString(0, 0, (uint8_t *) "tm isnt synced", 16);
 
     initialise_wifi();
     while (!isConnect) {
@@ -38,7 +34,7 @@ void app_main(void) {
     }
 
     esp_wait_sntp_sync();
-//    MY_AUDIO_Init();
+    MY_AUDIO_Init();
     Audio_Play();
 }
 

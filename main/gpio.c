@@ -10,6 +10,7 @@
 #include "main.h"
 #include "oled.h"
 #include "gui.h"
+#include "fm.h"
 
 bool isSpeakerOn = false;
 
@@ -20,13 +21,28 @@ static void gpio_isr_handler(void *arg) {
             isFM = !isFM;
             break;
         case Key2_Pin:
-            //            OLED_ShowString(50, 3, (uint8_t *) "2", 16);
+            if (isFM) {
+                freq_temp -= RDA5807.channelSpacing;
+            } else {
+                if (stationID == 0) {
+                    stationID = 7;
+                } else {
+                    stationID--;
+                }
+            }
             break;
         case Key3_Pin:
-            //            OLED_ShowString(50, 3, (uint8_t *) "3", 16);
+            if (isFM) {
+                freq_temp += RDA5807.channelSpacing;
+            } else {
+                if (stationID == 7) {
+                    stationID = 0;
+                } else {
+                    stationID++;
+                }
+            }
             break;
         case Key4_Pin:
-            //            OLED_ShowString(50, 3, (uint8_t *) "4", 16);
             ToggleSpeaker();
             break;
         default:

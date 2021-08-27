@@ -40,8 +40,6 @@ void esp_wait_sntp_sync(void) {
     }
 
     // set timezone to China Standard Time
-//    setenv("TZ", "UTC+8", 1);
-//    timeinfo.tm_hour += 8;
     setenv("TZ", "CST-8", 1);
     tzset();
 

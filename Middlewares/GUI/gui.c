@@ -60,8 +60,8 @@ void OLED_ShowTimeCalibrating() {
     }
 }
 
+uint32_t freq_temp = -1;
 void OLED_ShowFM() {
-    static uint32_t freq_temp = -1;
     static uint8_t rssi_temp = -1;
     char ch[30];
     RDA_ReadAllInfo();
@@ -81,9 +81,9 @@ void OLED_ShowFM() {
         OLED_ShowString(0, 6, (uint8_t *) "SW  Pre Nex Mute", 16);
     } else {
         if (freq_temp != RDA5807.freq) {
-            sprintf(ch, "freq:%6d", RDA5807.freq);
+            sprintf(ch, "freq:%6d", freq_temp);
             OLED_ShowString(0, 2, (uint8_t *) ch, 16);
-            freq_temp = RDA5807.freq;
+            RDA_SetFrequency(freq_temp);
         }
         if (rssi_temp != RDA5807.radioInfo.rssi) {
             sprintf(ch, "rssi: %2d/64", RDA5807.radioInfo.rssi + 1);
@@ -94,7 +94,7 @@ void OLED_ShowFM() {
 }
 
 void OLED_ShowInternetFM() {
-    static uint16_t stationID_temp = -1;
+    static uint8_t stationID_temp = -1;
     char ch[30];
     if (lastState != 3) {
         OLED_Clear();
@@ -103,18 +103,18 @@ void OLED_ShowInternetFM() {
 
         OLED_ShowString(0, 2, (uint8_t *) "IP:115.231.142.5", 16);
 
-        sprintf(ch, "%d", stationID);
+        sprintf(ch, "FM%4d", ConvStaIDToName(stationIDList[stationID]));
         OLED_ShowString(0, 4, (uint8_t *) ch, 16);
         stationID_temp = stationID;
 
-        OLED_ShowQingtingLogo(5 * 8, 4);
+        OLED_ShowQingtingLogo(6 * 8, 4);
 
         OLED_ShowString(0, 6, (uint8_t *) "SW  Pre Nex Mute", 16);
     } else {
         if (stationID_temp != stationID) {
             Audio_SelectStation(stationID);
-//            sprintf(ch, "station:%d", stationID);
-//            OLED_ShowString(0, 4, (uint8_t *) ch, 16);
+            sprintf(ch, "FM%4d", ConvStaIDToName(stationIDList[stationID]));
+            OLED_ShowString(0, 4, (uint8_t *) ch, 16);
             stationID_temp = stationID;
         }
     }
@@ -143,14 +143,27 @@ void OLED_ShowTime() {
     OLED_ShowString(56, 0, (uint8_t *) ch, 16);
 }
 
-uint16_t ConvStaIDToName(uint16_t stationID){
-    switch (stationID) {
+uint16_t ConvStaIDToName(uint16_t _stationID) {
+    switch (_stationID) {
         case 4522:
-            return 93; //FM93交通之声
+            return 930;      //FM93交通之声
         case 4518:
-            return 88;
+            return 880;      //浙江之声
+        case 1133:
+            return 918;     //杭州交通91.8电台
+        case 1163:
+            return 1054;    //西湖之声
+        case 4521:
+            return 996;     //浙江FM99.6
+        case 1135:
+            return 922;     //嘉兴交通广播
+        case 4866:
+            return 968;     //浙江音乐调频
+        case 4523:
+            return 1070;    //浙江城市之声
+        default:
+            return -1;
     }
-    return -1;
 }
 
 void OLED_ShowQingtingLogo(uint8_t x, uint8_t y) {
@@ -178,17 +191,17 @@ void OLED_ShowQingtingLogo(uint8_t x, uint8_t y) {
             OLED_WR_DATA(logo[2 * j + 1][i]);
         }
     }
-    OLED_ShowChar(x + 2 * 16, y, ' ', 16);
+//    OLED_ShowChar(x + 2 * 16, y, ' ', 16);
     for (uint8_t j = 2; j < 4; j++) {
-        OLED_Set_Pos(x + 8 + j * 16, y);
+        OLED_Set_Pos(x + j * 16, y);
         for (uint8_t i = 0; i < 16; i++) {
             OLED_WR_DATA(logo[2 * j][i]);
         }
-        OLED_Set_Pos(x + 8 + j * 16, y + 1);
+        OLED_Set_Pos(x + j * 16, y + 1);
         for (uint8_t i = 0; i < 16; i++) {
             OLED_WR_DATA(logo[2 * j + 1][i]);
         }
     }
-    OLED_ShowChar(x + 4 * 16 + 8, y, 'F', 16);
-    OLED_ShowChar(x + 4 * 16 + 2 * 8, y, 'M', 16);
+    OLED_ShowChar(x + 4 * 16, y, 'F', 16);
+    OLED_ShowChar(x + 4 * 16 + 8, y, 'M', 16);
 }

@@ -7,10 +7,14 @@
 #include "fm.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "string.h"
 
 #define FM907_Freq 90700
 
 struct RDA_Handler RDA5807;
+
+RADIO_FREQ FMStationList[50] = {0};
+uint16_t FMStationNum = 0;
 
 void RDA_ReadAllInfo() {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
@@ -59,7 +63,11 @@ void RDA_WriteAllInfo() {
     i2c_cmd_link_delete(cmd);
 }
 
+
+
+
 void RDA_Init() {
+    const uint8_t RSSI_MIN = 20;
     RDA5807.channelSpacing = 100;
     // Reg 0x00 and 0x01 are not used
     RDA5807.regList[0] = 0;
@@ -72,8 +80,20 @@ void RDA_Init() {
     RDA5807.regList[7] = 0b00000000 << 8 | 0b00000000;
 
     RDA_WriteAllInfo();
-
     RDA_Reset();
+
+//    memset(FMStationList, -1, sizeof(FMStationList));
+//    FMStationNum = 0;
+//    for (RADIO_FREQ i = 87000; i <= 108000; i += RDA5807.channelSpacing) {
+//        RDA_SetFrequency(i);
+//        RDA_ReadAllInfo();
+//        if (RDA5807.radioInfo.rssi >= RSSI_MIN) {
+//            FMStationList[FMStationNum] = i;
+//            FMStationNum++;
+//        }
+//    }
+//    printf("%dStation found\r\n", FMStationNum);
+//    RDA_SetFrequency(FMStationList[0]);
 
 //    xTaskCreate(show_fm, "show_fm", 4096, NULL, 3, NULL);
 }
@@ -159,7 +179,7 @@ void show_fm(void *pvParameters) {
     char ch[30];
     while (true) {
         RDA_ReadAllInfo();
-        sprintf(ch, "%d %d", RDA5807.freq,RDA5807.radioInfo.rssi);
+        sprintf(ch, "%d %d", RDA5807.freq, RDA5807.radioInfo.rssi);
         OLED_ShowString(0, 6, (uint8_t *) ch, 16);
         vTaskDelay(1000 / portTICK_RATE_MS);
     }
