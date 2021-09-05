@@ -198,6 +198,194 @@ void Audio_SelectStation(uint16_t new_stationID) {
 }
 ```
 
+### OLED底层驱动
+
+OLED底层驱动还是使用了我的[祖传代码](https://github.com/kaidegit/HWDrivers4MCU/tree/main/OLED_SSD1306_i2c)，虽然是i2c的，但是稍微改改发送接口，从spi发送就可以正常使用了。
+
+```c++
+void MY_SPI_Init() {
+    spi_bus_config_t buscfg = {
+            .miso_io_num=-1,
+            .mosi_io_num=OLED_MOSI_Pin,
+            .sclk_io_num=OLED_CLK_Pin,
+            .quadwp_io_num=-1,
+            .quadhd_io_num=-1,
+            .max_transfer_sz=0
+    };
+    spi_device_interface_config_t devcfg = {
+            .clock_speed_hz=1 * 1000 * 1000,        //Clock out at 1 MHz
+            .mode=0,                                //SPI mode 0
+            .spics_io_num=-1,                       //CS pin
+            .queue_size=7,                          //We want to be able to queue 7 transactions at a time
+    };
+    ESP_ERROR_CHECK(spi_bus_initialize(OLED_SPI_HOST, &buscfg, SPI_DMA_DISABLED));
+    ESP_ERROR_CHECK(spi_bus_add_device(OLED_SPI_HOST, &devcfg, &oled_spi_handle));
+}
+
+spi_device_handle_t oled_spi_handle;
+
+void oled_send(uint8_t dc, uint8_t data) {
+    spi_transaction_t t = {0};
+    t.length = 8;
+    t.tx_buffer = &data;
+    gpio_set_level(OLED_DC_Pin, dc == 0x40);
+    spi_device_polling_transmit(oled_spi_handle, &t);
+}
+```
+
+### FM底层驱动
+
+这款FM芯片有个坑，它并非像传统的i2c设备一样，可以通过发送设备地址-发送寄存器地址-读或者写值这种操作方法来操作，而是只能顺序读取或者写入所有寄存器数据，具体可以参考数据手册。
+
+由于没能找到比较好的驱动，我这里参考github上一个适配于arduino的程序自己写了一个较为简陋的驱动
+
+```c++
+struct RDA_Handler RDA5807;
+
+RADIO_FREQ FMStationList[50] = {0};
+uint16_t FMStationNum = 0;
+
+void RDA_ReadAllInfo() {
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, 0x21, 1);
+    // from 0x0A high to 0x0C low
+    uint8_t i2c_data_array[6];
+    // read 0x0A
+    i2c_master_read_byte(cmd, i2c_data_array + 0, 0);
+    i2c_master_read_byte(cmd, i2c_data_array + 1, 0);
+    // read 0x0B
+    i2c_master_read_byte(cmd, i2c_data_array + 2, 0);
+    i2c_master_read_byte(cmd, i2c_data_array + 3, 0);
+    // read 0x0C
+    i2c_master_read_byte(cmd, i2c_data_array + 4, 0);
+    i2c_master_read_byte(cmd, i2c_data_array + 5, 1);
+    i2c_master_stop(cmd);
+    i2c_master_cmd_begin(FM_I2C_HOST, cmd, 1000 / portTICK_RATE_MS);
+    i2c_cmd_link_delete(cmd);
+    RDA5807.radioInfo.rds = i2c_data_array[0] & 0x80;
+    uint16_t readChan = ((i2c_data_array[0] & 0x03) << 8) + i2c_data_array[1];
+    switch (RDA5807.band) {
+        case RADIO_BAND_US:
+            RDA5807.freq = RDA5807.channelSpacing * readChan + 87 * 1000;
+            break;
+        case RADIO_BAND_JP:
+        case RADIO_BAND_WW:
+            RDA5807.freq = RDA5807.channelSpacing * readChan + 76 * 1000;
+            break;
+        case RADIO_BAND_EE:
+            RDA5807.freq = RDA5807.channelSpacing * readChan + 65 * 1000;
+    }
+    RDA5807.radioInfo.rssi = i2c_data_array[2] >> 2;
+}
+
+void RDA_WriteAllInfo() {
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, 0x20, 1);
+    for (uint8_t i = 2; i < 8; i++) {
+        i2c_master_write_byte(cmd, RDA5807.regList[i] >> 8, 1);
+        i2c_master_write_byte(cmd, RDA5807.regList[i] & 0xff, 1);
+    }
+    i2c_master_stop(cmd);
+    i2c_master_cmd_begin(FM_I2C_HOST, cmd, 1000 / portTICK_RATE_MS);
+    i2c_cmd_link_delete(cmd);
+}
+
+void RDA_Init() {
+    RDA5807.channelSpacing = 100;
+    // Reg 0x00 and 0x01 are not used
+    RDA5807.regList[0] = 0;
+    RDA5807.regList[1] = 0;
+    RDA5807.regList[2] = 0b11000000 << 8 | 0b00000011;
+    RDA5807.regList[3] = 0b00000000 << 8 | 0b00000000;
+    RDA5807.regList[4] = 0b00001000 << 8 | 0b00000000;
+    RDA5807.regList[5] = 0b10000100 << 8 | 0b11010100;
+    RDA5807.regList[6] = 0b00000000 << 8 | 0b00000000;
+    RDA5807.regList[7] = 0b00000000 << 8 | 0b00000000;
+
+    RDA_WriteAllInfo();
+    RDA_Reset();
+}
+
+void RDA_Reset() {
+    RDA5807.regList[RADIO_REG_CTRL] |= RADIO_REG_CTRL_RESET;
+    RDA_WriteAllInfo();
+    vTaskDelay(100 / portTICK_RATE_MS);
+    RDA5807.regList[RADIO_REG_CTRL] &= !RADIO_REG_CTRL_RESET;
+    RDA_WriteAllInfo();
+}
+
+void RDA_SetBandFrequency(enum RADIO_BAND newBand, RADIO_FREQ newFreq) {
+    RDA_SetBand(newBand);
+    RDA_SetFrequency(newFreq);
+}
+
+void RDA_SetFrequency(RADIO_FREQ newFreq) {
+    RADIO_FREQ freqHigh, freqLow;
+    switch (RDA5807.band) {
+        case RADIO_BAND_US:
+            freqLow = 87000;
+            freqHigh = 108000;
+            break;
+        case RADIO_BAND_JP:
+            freqLow = 76000;
+            freqHigh = 91000;
+            break;
+        case RADIO_BAND_WW:
+            freqLow = 76000;
+            freqHigh = 108000;
+            break;
+        case RADIO_BAND_EE:
+            freqLow = 65000;
+            freqHigh = 76000;
+            break;
+        default:
+            freqLow = 65000;
+            freqHigh = 108000;
+            break;
+    }
+    if (newFreq < freqLow) newFreq = freqLow;
+    if (newFreq > freqHigh) newFreq = freqHigh;
+    uint16_t regChannel = RDA5807.regList[RADIO_REG_CHAN] &
+                          (RADIO_REG_CHAN_SPACE | RADIO_REG_CHAN_BAND);
+    uint16_t newChannel = (newFreq - freqLow) / RDA5807.channelSpacing;
+    regChannel += RADIO_REG_CHAN_TUNE; // enable tuning
+    regChannel |= newChannel << 6;
+    RDA5807.regList[RADIO_REG_CTRL] |=
+            RADIO_REG_CTRL_OUTPUT | RADIO_REG_CTRL_UNMUTE |
+            RADIO_REG_CTRL_RDS | RADIO_REG_CTRL_ENABLE; //  | RADIO_REG_CTRL_NEW
+    RDA5807.regList[RADIO_REG_CHAN] = regChannel;
+    RDA_WriteAllInfo();
+}
+
+void RDA_SetBand(enum RADIO_BAND newBand) {
+    RDA5807.band = newBand;
+    switch (newBand) {
+        case RADIO_BAND_US:
+            RDA5807.regList[RADIO_REG_CHAN] &= !RADIO_REG_CHAN_BAND;
+            RDA5807.regList[RADIO_REG_CHAN] |= RADIO_REG_CHAN_BAND_US;
+            break;
+        case RADIO_BAND_JP:
+            RDA5807.regList[RADIO_REG_CHAN] &= !RADIO_REG_CHAN_BAND;
+            RDA5807.regList[RADIO_REG_CHAN] |= RADIO_REG_CHAN_BAND_JP;
+            break;
+        case RADIO_BAND_WW:
+            RDA5807.regList[RADIO_REG_CHAN] &= !RADIO_REG_CHAN_BAND;
+            RDA5807.regList[RADIO_REG_CHAN] |= RADIO_REG_CHAN_BAND_WW;
+            break;
+        case RADIO_BAND_EE:
+            RDA5807.regList[RADIO_REG_CHAN] &= !RADIO_REG_CHAN_BAND;
+            RDA5807.regList[RADIO_REG_CHAN] |= RADIO_REG_CHAN_BAND_EE;
+            break;
+        default:
+            break;
+    }
+    RDA5807.regList[RADIO_REG_CHAN] |= RADIO_REG_CHAN_SPACE_100;
+    RDA_WriteAllInfo();
+}
+```
+
 ### GUI部分
 
 GUI部分我新建了一个线程，根据各个标志位来判断模式，显示各类信息
@@ -447,5 +635,9 @@ static void gpio_isr_handler(void *arg) {
 }
 ```
 
+## 感悟与心得
 
+初次上手乐鑫，我感觉乐鑫的例程还是十分丰富的。由于在使用STM32时，我已经对cmake有一个初步的掌握了，转到乐鑫的esp-idf时就显得不那么费力了，也能继续用我熟悉的CLion了。但是似乎对于那些只熟悉MDK-ARM或者IAR的嵌入式开发者，转而使用乐鑫idf就似乎显得要学的东西有点多了。
+
+再对比下当下STM32和ESP32的价格和性能，ESP32还真是便宜大碗啊，还有着WiFi功能。尽管ESP的库比ST的Hal库庞大亿点，深入调试略微麻烦，有些库甚至封装成了lib，但还是在群友的帮助下解决了问题。
 
